@@ -11,6 +11,6 @@ pub fn init() -> Result<(), std::io::Error> {
     fs::write(repo_path.join("HEAD"), format!("ref: refs/heads/main\n"))?;
 
     //for it add command
-    fs::write(repo_path.join("index"), format!("it-index"))?;
+    fs::File::create(repo_path.join("index"))?;
     Ok(())
 }
