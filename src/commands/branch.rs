@@ -21,14 +21,23 @@ pub fn branch(name: Option<String>) -> std::io::Result<()> {
                 return Ok(());
             }
 
-            // todo: get commit hash and write to branch
+            let current_hash = fs::read_to_string(current_ref_path)?;
+            fs::write(new_branch_path, current_hash)?;
             println!("branch '{branch_name}' created");
         }
 
         None => {
             let entries = fs::read_dir(heads_path)?;
+            let head_content = fs::read_to_string(repo_path.join("HEAD"))?;
+            let current_branch = head_content.trim_start_matches("ref: refs/heads/").trim();
+
             for entry in entries {
-                println!("* {}", entry?.file_name().to_string_lossy()); // todo: add asterisk to current branch only
+                let entry = entry?;
+                if current_branch.eq(entry.file_name().to_str().unwrap()) {
+                    println!("* {}", entry.file_name().to_string_lossy());
+                } else {
+                    println!("  {}", entry.file_name().to_string_lossy());
+                }
             }
         }
     }
