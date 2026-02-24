@@ -1,178 +1,195 @@
 # it - Mini Git-like CLI in Rust
 
-A small Rust project that implements a lightweight, Git-style version control CLI using a local `.it/` directory.
+A lightweight, Git-style version control CLI built in Rust. Uses a local `.it/` directory to store objects, refs, and logs.
 
-This project currently supports repository initialization, staging files, branching, switching branches, committing, and viewing logs.
+## Installation
 
-## Project Structure
+```bash
+git clone https://github.com/solana-turbin3/accel-challenge-week3-breakout4.git
+cd accel-challenge-week3-breakout4
+cargo install --path .
+```
 
-- `.it/objects` - object storage
-- `.it/refs/heads` - branch pointers
-- `.it/HEAD` - current branch reference
-- `.it/index` - staging area
-- `.it/logs` - commit and branch logs
+Make sure `~/.cargo/bin` is in your `PATH`. After installation, all commands are available as `it <command>`.
 
-## Current Architecture
+## Repository Structure
+
+```
+.it/
+├── objects/          # blob, tree, and commit objects (zlib-compressed)
+├── refs/
+│   └── heads/        # branch refs (each file contains a commit hash)
+├── logs/
+│   ├── HEAD.md       # HEAD log
+│   └── refs/
+│       └── heads/    # per-branch reflog
+├── HEAD              # symref pointing to current branch (e.g. ref: refs/heads/main)
+└── index             # staging area
+```
+
+## Architecture
 
 ```mermaid
 flowchart TD
-  CLI[CLI: src/main.rs + clap] --> INIT[init command]
-  CLI --> ADD[add command]
-  CLI --> BRANCH[branch command]
-  CLI --> SWITCH[switch command]
-  CLI --> COMMIT[commit flow]
-  CLI --> LOG[log command]
+  CLI[CLI: src/main.rs + clap] --> INIT[it init]
+  CLI --> ADD[it add]
+  CLI --> BRANCH[it branch]
+  CLI --> SWITCH[it switch]
+  CLI --> COMMIT[it commit]
+  CLI --> LOG[it log]
+  CLI --> RESET[it reset]
 
-  ADD --> INDEX[src/index.rs]
-  ADD --> HASH[hash_object utilities]
+  ADD --> INDEX[index.rs]
+  ADD --> HASH[hash_object.rs]
+
   COMMIT --> WT[write_tree.rs]
   COMMIT --> CT[commit_tree.rs]
+  COMMIT --> LOGMOD[log.rs]
   WT --> HASH
   CT --> HASH
 
-  INIT --> REPO[.it repository]
+  BRANCH --> LOGMOD
+
+  INIT --> REPO[.it/ repository]
   INDEX --> REPO
   HASH --> REPO
   BRANCH --> REPO
   SWITCH --> REPO
-  LOG --> REPO
-```
-
-## Run the CLI
-
-Use Cargo to run commands:
-
-```bash
-cargo run -- <command> [args]
-```
-
-Example:
-
-```bash
-cargo run -- init
+  LOGMOD --> REPO
+  RESET --> REPO
+  CT --> REPO
 ```
 
 ## Commands
 
-### 1) `init`
+### `it init`
+
 Creates a new `.it` repository in the current directory.
 
 ```bash
-cargo run -- init
+it init
 ```
 
-What it does:
-- Creates `.it/objects`
-- Creates `.it/refs/heads/main`
-- Sets `.it/HEAD` to `main`
-- Initializes `.it/index` and log folders
+- Creates `.it/objects/`, `.it/refs/heads/`, `.it/logs/refs/heads/`
+- Sets `.it/HEAD` to `ref: refs/heads/main`
+- Initializes `.it/index` (staging area) and `.it/logs/HEAD.md`
 
 ---
 
-### 2) `add <paths...>`
-Stages one or more files/folders into the index.
+### `it add <paths...>`
+
+Stages one or more files or directories into the index.
 
 ```bash
-cargo run -- add src/main.rs
-cargo run -- add src notes.txt
+it add src/main.rs
+it add src notes.txt
 ```
 
-What it does:
 - Recursively walks input paths
-- Skips `.it` and `target`
-- Hashes file contents
+- Skips `.it` and `target` directories
+- Hashes file contents as blob objects
 - Updates entries in `.it/index`
 
 ---
 
-### 3) `branch [name]`
-Lists branches or creates a new branch.
+### `it branch [name]`
 
-List branches:
-
-```bash
-cargo run -- branch
-```
-
-Create a branch:
+Lists branches or creates a new one.
 
 ```bash
-cargo run -- branch feature-x
+it branch              # list all branches (* marks current)
+it branch feature-x    # create a new branch from current HEAD
 ```
 
-What it does:
-- Without name: prints all branches and marks current branch with `*`
-- With name: creates branch ref from current HEAD commit
+- Without a name: prints all branches, marks current with `*`
+- With a name: creates a new branch ref pointing to HEAD's current commit
+- Logs the branch creation in `.it/logs/refs/heads/<name>`
 
 ---
 
-### 4) `switch <name>`
-Switches `HEAD` to an existing branch.
+### `it switch <name>`
+
+Switches HEAD to an existing branch.
 
 ```bash
-cargo run -- switch feature-x
+it switch feature-x
 ```
 
-What it does:
-- Validates branch exists in `.it/refs/heads`
-- Updates `.it/HEAD` to point to that branch
+- Validates the branch exists in `.it/refs/heads/`
+- Updates `.it/HEAD` to point to the target branch
+- Prints a message if already on that branch
 
 ---
 
-### 5) `commit <message>`
+### `it commit -m <message>`
+
 Creates a commit from staged index content.
 
 ```bash
-cargo run -- commit "Initial commit"
+it commit -m "Initial commit"
 ```
 
-What it does:
-- Builds a tree hash from index entries
-- Reads parent commit from current branch
-- Creates and stores a commit object
-- Updates current branch ref to new commit hash
-- Appends commit info to branch log
+- Builds a tree object from index entries (`write_tree`)
+- Reads parent commit hash from current branch ref
+- Creates and stores a commit object with tree, parent, author, committer, and message
+- Updates current branch ref to the new commit hash
+- Appends commit info to the branch reflog
 
 ---
 
-### 6) `log`
-Prints log lines for the current branch.
+### `it log`
+
+Prints reflog entries for the current branch.
 
 ```bash
-cargo run -- log
+it log
 ```
 
-What it does:
 - Reads current branch from `.it/HEAD`
-- Prints entries from corresponding `.it/logs/refs/heads/<branch>` file
+- Prints entries from `.it/logs/refs/heads/<branch>`
 
 ---
 
-### 7) `write`
-Declared in CLI, currently placeholder (no operation).
+### `it reset`
+
+Resets the current branch to its parent commit and restores the working tree.
 
 ```bash
-cargo run -- write
+it reset
 ```
+
+- Reads the current commit from the branch ref
+- Finds the parent commit hash from the commit object
+- Updates the branch ref to the parent
+- Restores the working tree (files and directories) from the parent's tree object
+- Prints "no parent commit found" if at the root commit
 
 ---
 
 ## Typical Workflow
 
 ```bash
-cargo run -- init
-cargo run -- add src notes.txt
-cargo run -- commit "first commit"
-cargo run -- branch feature-x
-cargo run -- switch feature-x
-cargo run -- add src/commands
-cargo run -- commit "work on feature"
-cargo run -- log
+it init
+it add src notes.txt
+it commit -m "first commit"
+it branch feature-x
+it switch feature-x
+it add src/commands
+it commit -m "work on feature"
+it log
+it reset
 ```
 
-## Notes
+## Environment Variables
 
-- Author/committer info for commit objects uses:
-  - `GIT_AUTHOR_NAME`
-  - `GIT_AUTHOR_EMAIL`
-- If these are not set, the code uses `Unknown` defaults.
+Author and committer info for commit objects is read from:
+
+- `GIT_AUTHOR_NAME` — defaults to `"Unknown"` if not set
+- `GIT_AUTHOR_EMAIL` — defaults to `"Unknown"` if not set
+
+Set them for the session:
+
+```bash
+export GIT_AUTHOR_NAME="Your Name"
+export GIT_AUTHOR_EMAIL="you@example.com"
+```
