@@ -15,11 +15,20 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     Init,
-    Branch { name: Option<String> }, // if no name list all branches else create one with name provided
-    Switch { name: String },         // switch HEAD to the given branch
-    Add { paths: Vec<String> },
+    Branch {
+        name: Option<String>,
+    },
+    Switch {
+        name: String,
+    },
+    Add {
+        paths: Vec<String>,
+    },
     Log,
-    Commit { message: String },
+    Commit {
+        #[arg(short)]
+        message: String,
+    },
     Reset,
 }
 
@@ -35,15 +44,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Commit { message } => {
             let tree_hash = commands::write_tree::write_tree()?;
             let parent_hash = commands::commit_tree::get_parent()?;
-            commands::commit_tree::commit_tree(
-                tree_hash.as_str(),
-                Some(parent_hash),
-                message.as_str(),
-            )?;
+            commands::commit_tree::commit_tree(&tree_hash, parent_hash, &message)?;
         }
         Commands::Reset => commands::reset::reset()?,
     }
-
 
     Ok(())
 }

@@ -41,12 +41,12 @@ fn collect_files(path: &Path, entries: &mut Vec<IndexEntry>) -> std::io::Result<
 }
 
 fn stage_file(path: &Path, entries: &mut Vec<IndexEntry>) -> std::io::Result<()> {
-    let data = fs::read(path).unwrap();
-    let sha_hex = hash_object(&data).unwrap();
-    let path_str = path.to_string_lossy().to_string();
+    let data = fs::read(path)?;
+    let sha_hex = hash_object(&data)?;
+    let path_str = path.to_string_lossy().to_string().replace("\\", "/");
     entries.retain(|e| e.path != path_str);
 
-    let flags = (path_str.len() as u16).min(0xFFF);
+    let flags = (path_str.len() as u16) & 0x0FFF; // better than doing min
     entries.push(IndexEntry {
         sha: hex_to_sha_bytes(&sha_hex),
         flags,

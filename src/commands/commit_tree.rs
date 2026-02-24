@@ -13,7 +13,7 @@ pub fn commit_tree(
     tree_hash: &str,
     parent: Option<String>,
     message: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<String, Box<dyn std::error::Error>> {
     let author_name = std::env::var("GIT_AUTHOR_NAME").unwrap_or_else(|_| "Unknown".to_string());
     let author_email = std::env::var("GIT_AUTHOR_EMAIL").unwrap_or_else(|_| "Unknown".to_string());
 
@@ -22,6 +22,7 @@ pub fn commit_tree(
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
+    // TODO: use utc
     let timezone_offset = 19800;
     let timezone = "+0530";
     let local_timestamp = now + timezone_offset;
@@ -66,19 +67,26 @@ pub fn commit_tree(
         println!("HEAD is detached; commit created without updating refs");
     }
 
-    println!(" Commit created (India Time): {}", commit_hash);
-    Ok(())
+    println!("committed: {}", commit_hash[..8].to_string());
+    Ok(commit_hash)
 }
 
-pub fn get_parent() -> Result<String, ItError> {
+pub fn get_parent() -> Result<Option<String>, ItError> {
     let repo_path = std::env::current_dir()?.join(".it");
-    if !repo_path.exists() || !repo_path.is_dir() {
-        return Err(ItError::NotARepository);
-    }
-    let heads_path = repo_path.join("refs/heads");
-
     let head_content = fs::read_to_string(repo_path.join("HEAD"))?;
-    let current_branch = head_content.trim_start_matches("ref: refs/heads/").trim();
-    let parent_hash = fs::read_to_string(heads_path.join(current_branch))?;
-    Ok(parent_hash)
+
+    // if head is detached
+    if !head_content.starts_with("ref:") {
+        return Ok(Some(head_content.trim().to_string()));
+    }
+
+    let ref_path_str = head_content.trim_start_matches("ref:").trim();
+    let ref_path = repo_path.join(ref_path_str);
+
+    if ref_path.exists() {
+        let parent_hash = fs::read_to_string(ref_path)?;
+        Ok(Some(parent_hash.trim().to_string()))
+    } else {
+        Ok(None)
+    }
 }

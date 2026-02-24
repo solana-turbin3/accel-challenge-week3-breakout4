@@ -10,11 +10,6 @@ pub fn init() -> Result<(), std::io::Error> {
     fs::create_dir_all(repo_path.join("objects"))?;
     fs::create_dir_all(repo_path.join("refs/heads"))?;
 
-    fs::write(
-        repo_path.join("refs/heads/main"),
-        "0000000000000000000000000000000000000000\n",
-    )?;
-
     fs::write(repo_path.join("HEAD"), format!("ref: refs/heads/main\n"))?;
 
     // LOG FILES
@@ -23,7 +18,7 @@ pub fn init() -> Result<(), std::io::Error> {
     fs::create_dir_all(logs_path.join("refs/heads"))?;
     fs::write(logs_path.join("HEAD.md"), "")?;
 
-    //for it add command
+    // for it add command (staging area)
     fs::File::create(repo_path.join("index"))?;
     Ok(())
 }

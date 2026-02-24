@@ -9,7 +9,7 @@ pub fn hash_object(data: &[u8]) -> Result<String, std::io::Error> {
     let blob = build_object(data, "blob");
     let hash = compute_hash(&blob);
     let compressed = compress_data(&blob)?;
-    // store_object(&hash, &compressed)?;
+    store_object(&hash, &compressed)?;
     Ok(hash)
 }
 
